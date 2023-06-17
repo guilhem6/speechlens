@@ -9,24 +9,30 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.text.Html
+import android.util.Log
+import android.view.LayoutInflater
 import android.widget.Button
-//import android.widget.ImageView
+import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.google.auth.oauth2.GoogleCredentials
 import com.google.cloud.translate.Translate
 import com.google.cloud.translate.TranslateOptions
 import com.google.cloud.translate.Translation
+import com.limehug.speechlens.databinding.ActivityMainBinding
 import java.io.File
 import java.io.FileWriter
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
-import com.google.auth.oauth2.GoogleCredentials
-import kotlinx.coroutines.DelicateCoroutinesApi
 
 
 class MainActivity : AppCompatActivity() {
@@ -34,9 +40,14 @@ class MainActivity : AppCompatActivity() {
     private var output: String? = null
     private var mediaRecorder: MediaRecorder? = null
 
+    //camera
+    private lateinit var binding : ActivityMainBinding
+    private var imageCapture:ImageCapture?=null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
 
         mediaRecorder = null
@@ -57,6 +68,14 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        //Passer à la page des paramètres
+        val settingsImage: ImageView = findViewById(R.id.settingsImage)
+        settingsImage.setOnClickListener {
+            val intent = Intent(this, SettingsActivity::class.java)
+            startActivity(intent)
+        }
+
+
         val buttonShow = findViewById<Button>(R.id.buttonShow)
         buttonShow.setOnClickListener{
             showText()
@@ -66,7 +85,56 @@ class MainActivity : AppCompatActivity() {
         buttonTranslate.setOnClickListener {
             translateAudio()
         }
+
+        //CAMERA
+        if(allPermissionsGranted()){
+            startCamera()
+        }else{
+            ActivityCompat.requestPermissions(this,Constants.REQUIRED_PERMISSIONS,Constants.REQUEST_CODE_PERMISSIONS)
+        }
     }
+
+    //CAMERA
+
+
+    private fun startCamera(){
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
+        cameraProviderFuture.addListener({
+            val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
+            val preview = Preview.Builder().build().also{mPreview ->
+                mPreview.setSurfaceProvider(binding.cameraPreview.surfaceProvider)}
+
+            imageCapture = ImageCapture.Builder().build()
+            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+
+            try{cameraProvider.unbindAll()
+                cameraProvider.bindToLifecycle(this,cameraSelector,preview,imageCapture)
+
+            }catch(e: Exception){
+                Log.d(Constants.TAG,"startCamera fail:",e)
+            }
+
+        },ContextCompat.getMainExecutor(this))
+    }
+    fun onRequestPermissionResult(
+    requestCode:Int,
+    permissions:Array<out String>, grantResults: IntArray) {
+        if(requestCode == Constants.REQUEST_CODE_PERMISSIONS){
+            if (allPermissionsGranted()){
+                startCamera()
+            }else{
+                Toast.makeText(this,"Permission not granted by the user.",Toast.LENGTH_SHORT).show()
+                finish()
+            }
+        }
+    }
+    private fun allPermissionsGranted() =
+        Constants.REQUIRED_PERMISSIONS.all{
+            ContextCompat.checkSelfPermission(
+                baseContext, it
+            ) == PackageManager.PERMISSION_GRANTED
+        }
+
 
     //val settingsImage = findViewById<ImageView>(R.id.settingsImage)
 
@@ -206,4 +274,5 @@ class MainActivity : AppCompatActivity() {
             e.printStackTrace()
         }
     }
+
 }

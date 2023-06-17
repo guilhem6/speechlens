@@ -52,49 +52,37 @@
         android:layout_marginBottom="32dp"
         android:text="Translate" />
 
+
     <TextView
         android:id="@+id/recordingDisplay"
         android:layout_width="match_parent"
-        android:layout_height="268dp"
+        android:layout_height="match_parent"
+        android:layout_above="@+id/buttonShow"
         android:layout_below="@+id/recordingTitle"
-        android:layout_marginStart="20dp"
-        android:layout_marginTop="-9dp"
-        android:layout_marginEnd="20dp"
-        android:layout_marginBottom="20dp" />
-
+        android:layout_alignEnd="@+id/recordingTitle"
+        android:layout_marginTop="0dp"
+        android:layout_marginEnd="0dp"
+        android:layout_marginBottom="0dp" />
 
     <TextView
         android:id="@+id/translationDisplay"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_above="@+id/buttonTranslate"
+        android:layout_above="@+id/buttonShow"
         android:layout_below="@+id/translationTitle"
-        android:layout_marginStart="20dp"
+        android:layout_marginStart="0dp"
         android:layout_marginTop="0dp"
-        android:layout_marginEnd="20dp"
-        android:layout_marginBottom="20dp" />
+        android:layout_marginBottom="0dp"
+        android:layout_toEndOf="@+id/recordingTitle" />
 
     <TextView
         android:id="@+id/recordingTitle"
-        android:layout_width="wrap_content"
+        android:layout_width="225dp"
         android:layout_height="wrap_content"
-        android:layout_below="@+id/toolbarParametres"
-        android:layout_marginStart="10dp"
-        android:layout_marginTop="29dp"
-        android:layout_marginEnd="10dp"
-        android:layout_marginBottom="10dp"
-        android:text="Transcription"
-        android:textSize="24sp" />
-
-    <TextView
-        android:id="@+id/translationTitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_below="@+id/recordingDisplay"
-        android:layout_marginStart="10dp"
+        android:layout_below="@+id/cameraPreview"
         android:layout_marginTop="0dp"
-        android:layout_marginEnd="10dp"
-        android:text="Translation"
+        android:layout_marginBottom="0dp"
+        android:text="Transcription"
         android:textSize="24sp" />
 
     <ImageView
@@ -108,5 +96,24 @@
         android:layout_marginBottom="10dp"
         app:srcCompat="@drawable/settings_image" />
 
+    <androidx.camera.view.PreviewView
+        android:id="@+id/cameraPreview"
+        android:layout_width="match_parent"
+        android:layout_height="300dp"
+        android:layout_below="@+id/toolbarParametres"
+        android:layout_marginTop="0dp" >
+
+    </androidx.camera.view.PreviewView>
+
+    <TextView
+        android:id="@+id/translationTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/cameraPreview"
+        android:layout_marginStart="0dp"
+        android:layout_marginTop="0dp"
+        android:layout_toEndOf="@+id/recordingTitle"
+        android:text="Translation"
+        android:textSize="24sp" />
 
 </RelativeLayout>

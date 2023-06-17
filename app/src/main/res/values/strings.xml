@@ -1,4 +1,9 @@
 <resources>
     <string name="app_name">speechlens</string>
     <string name="title_activity_settings">SettingsActivity</string>
+    <string-array name="spinner_items">
+        <item>Option 1</item>
+        <item>Option 2</item>
+        <item>Option 3</item>
+    </string-array>
 </resources>
