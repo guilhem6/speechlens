@@ -4,12 +4,10 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    tools:context=".MainActivity">
-
-
+    tools:context=".MainActivity"
+    android:id="@+id/mainLayout">
 
     <androidx.appcompat.widget.Toolbar
-
         android:id="@+id/toolbarParametres"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
@@ -18,72 +16,54 @@
         app:title="SpeechLens"
         app:popupTheme="@style/ThemeOverlay.AppCompat.Light"
         app:contentInsetEnd="16dp"
+        android:layout_alignParentTop="true" />
 
-        app:layout_constraintBaseline_toTopOf="parent"/>
+    <androidx.camera.view.PreviewView
+        android:id="@+id/cameraPreview"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@+id/toolbarParametres" />
 
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
 
+        <TextView
+            android:id="@+id/subtitleTextView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textColor="@android:color/white"
+            android:background="@android:color/black" />
+
+        <FrameLayout
+            android:id="@+id/textOverlayContainer"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+    </FrameLayout>
 
     <Button
         android:id="@+id/buttonRecord"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
-        android:layout_centerVertical="true"
         android:layout_marginLeft="32dp"
         android:layout_marginBottom="32dp"
         android:text="Record" />
 
     <Button
-        android:id="@+id/buttonShow"
+        android:id="@+id/buttonMode"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
         android:layout_centerHorizontal="true"
         android:layout_marginBottom="32dp"
-        android:text="Show" />
-
-    <Button
-        android:id="@+id/buttonTranslate"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignParentRight="true"
-        android:layout_alignParentBottom="true"
-        android:layout_marginRight="32dp"
-        android:layout_marginBottom="32dp"
-        android:text="Translate" />
+        android:text="Mode" />
 
 
-    <TextView
-        android:id="@+id/recordingDisplay"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_above="@+id/buttonShow"
-        android:layout_below="@+id/recordingTitle"
-        android:layout_alignEnd="@+id/recordingTitle"
-        android:layout_marginTop="0dp"
-        android:layout_marginEnd="0dp"
-        android:layout_marginBottom="0dp" />
 
-    <TextView
-        android:id="@+id/translationDisplay"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_above="@+id/buttonShow"
-        android:layout_below="@+id/translationTitle"
-        android:layout_marginStart="0dp"
-        android:layout_marginTop="0dp"
-        android:layout_marginBottom="0dp"
-        android:layout_toEndOf="@+id/recordingTitle" />
 
-    <TextView
-        android:id="@+id/recordingTitle"
-        android:layout_width="225dp"
-        android:layout_height="wrap_content"
-        android:layout_below="@+id/cameraPreview"
-        android:layout_marginTop="0dp"
-        android:layout_marginBottom="0dp"
-        android:text="Transcription"
-        android:textSize="24sp" />
 
     <ImageView
         android:id="@+id/settingsImage"
@@ -95,25 +75,5 @@
         android:layout_marginEnd="10dp"
         android:layout_marginBottom="10dp"
         app:srcCompat="@drawable/settings_image" />
-
-    <androidx.camera.view.PreviewView
-        android:id="@+id/cameraPreview"
-        android:layout_width="match_parent"
-        android:layout_height="300dp"
-        android:layout_below="@+id/toolbarParametres"
-        android:layout_marginTop="0dp" >
-
-    </androidx.camera.view.PreviewView>
-
-    <TextView
-        android:id="@+id/translationTitle"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_below="@+id/cameraPreview"
-        android:layout_marginStart="0dp"
-        android:layout_marginTop="0dp"
-        android:layout_toEndOf="@+id/recordingTitle"
-        android:text="Translation"
-        android:textSize="24sp" />
 
 </RelativeLayout>
