@@ -6,6 +6,8 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.media.MediaRecorder
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -31,6 +33,7 @@ import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.compose.ui.text.toUpperCase
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.google.auth.oauth2.GoogleCredentials
@@ -52,6 +55,10 @@ import kotlinx.coroutines.launch
     private var output: String? = null
     private var mediaRecorder: MediaRecorder? = null
     private var currentMode = "transcription"
+    private val handler = Handler()
+    private val delayMillis: Long = 10000 // Délai en millisecondes entre les appels de la fonction
+    // Définissez un drapeau pour suivre si la reconnaissance audio est en cours
+    private var isListening = false
 
 
     //camera
@@ -60,6 +67,11 @@ import kotlinx.coroutines.launch
     private lateinit var textOverlayContainer: FrameLayout
     private lateinit var textView: TextView
 
+    private lateinit var speechRecognizer: SpeechRecognizer
+    private lateinit var speechRecognitionListener: RecognitionListener
+    private val outputFile: String by lazy {
+        getExternalFilesDir(null)?.absolutePath + "/recording.txt"
+    }
 
     val options = FaceDetectorOptions.Builder()
         .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
@@ -96,8 +108,9 @@ import kotlinx.coroutines.launch
             val bounds = face.boundingBox // Récupérez les coordonnées du visage
 
             // Calculer les coordonnées du TextView en dessous du visage
-            val textViewX = bounds.centerX().toFloat() + bounds.width().toFloat()
+            val textViewX = bounds.centerX().toFloat()
             val textViewY = bounds.bottom.toFloat() + 6*bounds.height().toFloat()
+            val textViewWidth = 4*bounds.width().toFloat()
 
 
             if (textView.parent != null) {
@@ -107,10 +120,8 @@ import kotlinx.coroutines.launch
             // Créer et personnaliser votre TextView
             textView.x = textViewX
             textView.y = textViewY
-            textView.setTextColor(Color.WHITE)
-            textView.setBackgroundColor(Color.BLACK)
             textView.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-
+            textView.maxWidth = textViewWidth.toInt()
             // Ajouter le TextView à votre conteneur textOverlayContainer
             textOverlayContainer.addView(textView)
         }
@@ -130,6 +141,46 @@ import kotlinx.coroutines.launch
         output = getExternalFilesDir(null)?.absolutePath + "/recording.mp3"
         println(output)
 
+        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
+        speechRecognitionListener = object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) {
+                Toast.makeText(this@MainActivity, "Ready for speech", Toast.LENGTH_SHORT).show()
+            }
+
+            override fun onBeginningOfSpeech() {
+                Toast.makeText(this@MainActivity, "Speech started", Toast.LENGTH_SHORT).show()
+            }
+
+            override fun onRmsChanged(rmsdB: Float) {}
+
+            override fun onBufferReceived(buffer: ByteArray?) {}
+
+            override fun onEndOfSpeech() {
+                Toast.makeText(this@MainActivity, "Speech ended", Toast.LENGTH_SHORT).show()
+            }
+
+            override fun onError(error: Int) {
+                Toast.makeText(this@MainActivity, "Speech recognition error", Toast.LENGTH_SHORT).show()
+            }
+
+            override fun onResults(results: Bundle?) {
+                val recognizedTexts = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                if (!recognizedTexts.isNullOrEmpty()) {
+                    val recognizedText = recognizedTexts[0]
+                    writeTextToFile(outputFile, recognizedText)
+                    Toast.makeText(this@MainActivity, "Speech recognized and saved to file", Toast.LENGTH_SHORT).show()
+                    translateAudio()
+                    showText()
+                } else {
+                    Toast.makeText(this@MainActivity, "No speech recognized", Toast.LENGTH_SHORT).show()
+                }
+            }
+
+            override fun onPartialResults(partialResults: Bundle?) {}
+
+            override fun onEvent(eventType: Int, params: Bundle?) {}
+        }
+
         val buttonRecord = findViewById<Button>(R.id.buttonRecord)
         buttonRecord.setOnClickListener {
             if (ContextCompat.checkSelfPermission(this,
@@ -140,7 +191,13 @@ import kotlinx.coroutines.launch
                 Toast.makeText(this, "Recording could not start!", Toast.LENGTH_SHORT).show()
 
             } else {
-                recognizeAudio()
+                if (isListening) {
+                    stopListening()
+                    buttonRecord.text = "Start"
+                } else {
+                    startListening()
+                    buttonRecord.text = "Stop"
+                }
             }
         }
 
@@ -168,6 +225,40 @@ import kotlinx.coroutines.launch
             ActivityCompat.requestPermissions(this,Constants.REQUIRED_PERMISSIONS,Constants.REQUEST_CODE_PERMISSIONS)
         }
     }
+
+
+    private fun startListening() {
+        // Start listening for speech
+        recognizeAudio()
+    }
+
+    private fun stopListening() {
+        // Stop listening for speech
+        speechRecognizer.stopListening()
+        speechRecognizer.cancel()
+        speechRecognizer.destroy()
+    }
+
+    private fun setupPeriodicRefresh() {
+        val handler = Handler(Looper.getMainLooper())
+        val refreshRunnable = object : Runnable {
+            override fun run() {
+                if (isListening) {
+                    // Send the collected information and refresh
+                    showText()
+                    refresh()
+                }
+                handler.postDelayed(this, 10000) // Refresh every 10 seconds
+            }
+        }
+        handler.postDelayed(refreshRunnable, 10000) // Start refreshing after 10 seconds
+    }
+
+    private fun refresh() {
+        writeTextToFile(outputFile, "")
+        // Implement the logic to refresh the UI or perform other actions
+    }
+
 
     //CAMERA
 
@@ -223,6 +314,15 @@ import kotlinx.coroutines.launch
 
     //val settingsImage = findViewById<ImageView>(R.id.settingsImage)
 
+    private val periodicRecognizeRunnable = object : Runnable {
+        override fun run() {
+            recognizeAudio()
+
+            // Planifier le prochain appel après le délai spécifié
+            handler.postDelayed(this, delayMillis)
+        }
+    }
+
 
     //Permet la traduction du fichier recording (via le bouton translate)
     private fun translateAudio() {
@@ -270,7 +370,7 @@ import kotlinx.coroutines.launch
                 val file = File(filePath)
                 if (file.exists()) {
                     val text = file.readText()
-                    textToShow = text
+                    textToShow = text.toUpperCase()
                 } else {
                     textToShow = "File not found"
                 }
@@ -278,7 +378,7 @@ import kotlinx.coroutines.launch
                 val file2 = File(filePath2)
                 if (file2.exists()) {
                     val text = file2.readText()
-                    textToShow = text
+                    textToShow = text.toUpperCase()
                 } else {
                     textToShow = "File not found"
                 }
@@ -287,7 +387,7 @@ import kotlinx.coroutines.launch
             e.printStackTrace()
             textToShow = "Error reading file"
         }
-
+        textView.setBackgroundColor(Color.BLACK)
         textView.text = textToShow
     }
 
