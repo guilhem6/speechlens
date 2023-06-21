@@ -1,6 +1,7 @@
 package com.limehug.speechlens
-
 import android.Manifest
+import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -61,7 +62,6 @@ import kotlinx.coroutines.launch
     private var isListening = false
 
 
-    //camera
     private lateinit var binding : ActivityMainBinding
     private var imageCapture:ImageCapture?=null
     private lateinit var textOverlayContainer: FrameLayout
@@ -129,6 +129,13 @@ import kotlinx.coroutines.launch
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        val sharedPreferences = getSharedPreferences("Prefs", Context.MODE_PRIVATE)
+
+        if(!sharedPreferences.contains("selectedLanguageCode")){
+            save("selectedLanguageCode","en")
+        }
+        val selectedLanguageCode = get("selectedLanguageCode")
+
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -217,6 +224,10 @@ import kotlinx.coroutines.launch
             showText()
         }
 
+        val buttonTranslate = findViewById<Button>(R.id.buttonTranslate)
+        buttonTranslate.setOnClickListener {
+            translateAudio(selectedLanguageCode)
+        }
 
         //CAMERA
         if(allPermissionsGranted()){
@@ -291,6 +302,8 @@ import kotlinx.coroutines.launch
             }
 
         },ContextCompat.getMainExecutor(this))
+
+        //startFaceDetection()
     }
     fun onRequestPermissionResult(
     requestCode:Int,
@@ -325,7 +338,7 @@ import kotlinx.coroutines.launch
 
 
     //Permet la traduction du fichier recording (via le bouton translate)
-    private fun translateAudio() {
+    private fun translateAudio(selectedLanguageCode: String) {
         val recordingFile = File(getExternalFilesDir(null), "recording.txt")
         val translationFile = File(getExternalFilesDir(null), "translation.txt")
 
@@ -340,7 +353,7 @@ import kotlinx.coroutines.launch
                 val translate = options.service
 
                 // Translate the recording text to English
-                val translation: Translation = translate.translate(recordingText, Translate.TranslateOption.targetLanguage("en"))
+                val translation: Translation = translate.translate(recordingText, Translate.TranslateOption.targetLanguage(selectedLanguageCode))
 
                 // Get the translated text
                 val translatedText: String = Html.fromHtml(translation.translatedText, Html.FROM_HTML_MODE_LEGACY).toString()
@@ -460,6 +473,18 @@ import kotlinx.coroutines.launch
         } catch (e: IOException) {
             e.printStackTrace()
         }
+    }
+
+    private fun save(location: String,value: String) {
+        val sharedPreferences = getSharedPreferences("Prefs", Context.MODE_PRIVATE)
+        val editor = sharedPreferences.edit()
+        editor.putString(location, value)
+        editor.apply()
+        Log.i("languages","$value saved in $location")
+    }
+
+    private fun get(location: String): String {
+        return getSharedPreferences("Prefs", Context.MODE_PRIVATE).getString(location, null).toString()
     }
 
 }
