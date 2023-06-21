@@ -70,8 +70,11 @@ import kotlinx.coroutines.launch
 
     private lateinit var speechRecognizer: SpeechRecognizer
     private lateinit var speechRecognitionListener: RecognitionListener
-    private val outputFile: String by lazy {
+    private val file: String by lazy {
         getExternalFilesDir(null)?.absolutePath + "/recording.txt"
+    }
+    private val file2: String by lazy {
+        getExternalFilesDir(null)?.absolutePath + "/translation.txt"
     }
 
     val options = FaceDetectorOptions.Builder()
@@ -175,7 +178,7 @@ import kotlinx.coroutines.launch
                 val recognizedTexts = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                 if (!recognizedTexts.isNullOrEmpty()) {
                     val recognizedText = recognizedTexts[0]
-                    writeTextToFile(outputFile, recognizedText)
+                    writeTextToFile(file, recognizedText)
                     Toast.makeText(this@MainActivity, "Speech recognized and saved to file", Toast.LENGTH_SHORT).show()
                     translateAudio(selectedLanguageCode)
                     showText()
@@ -263,7 +266,7 @@ import kotlinx.coroutines.launch
     }
 
     private fun refresh() {
-        writeTextToFile(outputFile, "")
+        writeTextToFile(file, "")
         // Implement the logic to refresh the UI or perform other actions
     }
 
