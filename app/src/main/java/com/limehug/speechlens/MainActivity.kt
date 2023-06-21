@@ -63,6 +63,7 @@ import kotlinx.coroutines.launch
 
 
     private lateinit var binding : ActivityMainBinding
+    private lateinit var selectedLanguageCode : String
     private var imageCapture:ImageCapture?=null
     private lateinit var textOverlayContainer: FrameLayout
     private lateinit var textView: TextView
@@ -176,7 +177,7 @@ import kotlinx.coroutines.launch
                     val recognizedText = recognizedTexts[0]
                     writeTextToFile(outputFile, recognizedText)
                     Toast.makeText(this@MainActivity, "Speech recognized and saved to file", Toast.LENGTH_SHORT).show()
-                    translateAudio()
+                    translateAudio(selectedLanguageCode)
                     showText()
                 } else {
                     Toast.makeText(this@MainActivity, "No speech recognized", Toast.LENGTH_SHORT).show()
@@ -224,10 +225,6 @@ import kotlinx.coroutines.launch
             showText()
         }
 
-        val buttonTranslate = findViewById<Button>(R.id.buttonTranslate)
-        buttonTranslate.setOnClickListener {
-            translateAudio(selectedLanguageCode)
-        }
 
         //CAMERA
         if(allPermissionsGranted()){
@@ -437,7 +434,7 @@ import kotlinx.coroutines.launch
                     val recognizedText = recognizedTexts[0]
                     writeTextToFile(outputFile, recognizedText)
                     Toast.makeText(this@MainActivity, "Speech recognized and saved to file", Toast.LENGTH_SHORT).show()
-                    translateAudio()
+                    translateAudio(selectedLanguageCode)
                     showText()
                 } else {
                     Toast.makeText(this@MainActivity, "No speech recognized", Toast.LENGTH_SHORT).show()
