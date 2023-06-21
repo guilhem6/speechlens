@@ -1,6 +1,7 @@
 package com.limehug.speechlens
-
 import android.Manifest
+import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.MediaRecorder
@@ -10,7 +11,6 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.text.Html
 import android.util.Log
-import android.view.LayoutInflater
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
@@ -40,11 +40,17 @@ class MainActivity : AppCompatActivity() {
     private var output: String? = null
     private var mediaRecorder: MediaRecorder? = null
 
-    //camera
     private lateinit var binding : ActivityMainBinding
     private var imageCapture:ImageCapture?=null
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        val sharedPreferences = getSharedPreferences("Prefs", Context.MODE_PRIVATE)
+
+        if(!sharedPreferences.contains("selectedLanguageCode")){
+            save("selectedLanguageCode","en")
+        }
+        val selectedLanguageCode = get("selectedLanguageCode")
+
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -83,7 +89,7 @@ class MainActivity : AppCompatActivity() {
 
         val buttonTranslate = findViewById<Button>(R.id.buttonTranslate)
         buttonTranslate.setOnClickListener {
-            translateAudio()
+            translateAudio(selectedLanguageCode)
         }
 
         //CAMERA
@@ -115,6 +121,8 @@ class MainActivity : AppCompatActivity() {
             }
 
         },ContextCompat.getMainExecutor(this))
+
+        //startFaceDetection()
     }
     fun onRequestPermissionResult(
     requestCode:Int,
@@ -140,7 +148,7 @@ class MainActivity : AppCompatActivity() {
 
 
     //Permet la traduction du fichier recording (via le bouton translate)
-    private fun translateAudio() {
+    private fun translateAudio(selectedLanguageCode: String) {
         val recordingFile = File(getExternalFilesDir(null), "recording.txt")
         val translationFile = File(getExternalFilesDir(null), "translation.txt")
 
@@ -155,7 +163,7 @@ class MainActivity : AppCompatActivity() {
                 val translate = options.service
 
                 // Translate the recording text to English
-                val translation: Translation = translate.translate(recordingText, Translate.TranslateOption.targetLanguage("en"))
+                val translation: Translation = translate.translate(recordingText, Translate.TranslateOption.targetLanguage(selectedLanguageCode))
 
                 // Get the translated text
                 val translatedText: String = Html.fromHtml(translation.translatedText, Html.FROM_HTML_MODE_LEGACY).toString()
@@ -273,6 +281,18 @@ class MainActivity : AppCompatActivity() {
         } catch (e: IOException) {
             e.printStackTrace()
         }
+    }
+
+    private fun save(location: String,value: String) {
+        val sharedPreferences = getSharedPreferences("Prefs", Context.MODE_PRIVATE)
+        val editor = sharedPreferences.edit()
+        editor.putString(location, value)
+        editor.apply()
+        Log.i("languages","$value saved in $location")
+    }
+
+    private fun get(location: String): String {
+        return getSharedPreferences("Prefs", Context.MODE_PRIVATE).getString(location, null).toString()
     }
 
 }
