@@ -13,6 +13,7 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.text.Html
+import android.text.method.ScrollingMovementMethod
 import android.util.Log
 import com.google.mlkit.vision.face.Face
 import com.google.mlkit.vision.face.FaceDetection
@@ -49,33 +50,30 @@ import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 
 @ExperimentalGetImage class MainActivity : AppCompatActivity() {
 
-    private var output: String? = null
+    private var translateCount : Int = 0
     private var mediaRecorder: MediaRecorder? = null
     private var currentMode = "transcription"
-    private val handler = Handler()
-    private val delayMillis: Long = 10000 // Délai en millisecondes entre les appels de la fonction
     // Définissez un drapeau pour suivre si la reconnaissance audio est en cours
     private var isListening = false
+    val MAX_LINES = 2
+
+    private val recognizedWords = mutableListOf<String>()
+
+
 
 
     private lateinit var binding : ActivityMainBinding
-    private lateinit var selectedLanguageCode : String
     private var imageCapture:ImageCapture?=null
     private lateinit var textOverlayContainer: FrameLayout
     private lateinit var textView: TextView
 
     private lateinit var speechRecognizer: SpeechRecognizer
     private lateinit var speechRecognitionListener: RecognitionListener
-    private val file: String by lazy {
-        getExternalFilesDir(null)?.absolutePath + "/recording.txt"
-    }
-    private val file2: String by lazy {
-        getExternalFilesDir(null)?.absolutePath + "/translation.txt"
-    }
 
     val options = FaceDetectorOptions.Builder()
         .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
@@ -112,10 +110,8 @@ import kotlinx.coroutines.launch
             val bounds = face.boundingBox // Récupérez les coordonnées du visage
 
             // Calculer les coordonnées du TextView en dessous du visage
-            val textViewX = bounds.centerX().toFloat()
+            val textViewX = bounds.centerX().toFloat() - 50f
             val textViewY = bounds.bottom.toFloat() + 6*bounds.height().toFloat()
-            val textViewWidth = 4*bounds.width().toFloat()
-
 
             if (textView.parent != null) {
                 (textView.parent as ViewGroup).removeView(textView)
@@ -125,7 +121,10 @@ import kotlinx.coroutines.launch
             textView.x = textViewX
             textView.y = textViewY
             textView.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-            textView.maxWidth = textViewWidth.toInt()
+            textView.maxWidth = 1000
+            textView.movementMethod = ScrollingMovementMethod.getInstance()
+
+
             // Ajouter le TextView à votre conteneur textOverlayContainer
             textOverlayContainer.addView(textView)
         }
@@ -139,7 +138,6 @@ import kotlinx.coroutines.launch
             save("selectedLanguageCode","en")
         }
         val selectedLanguageCode = get("selectedLanguageCode")
-
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -149,8 +147,6 @@ import kotlinx.coroutines.launch
 
 
         mediaRecorder = null
-        output = getExternalFilesDir(null)?.absolutePath + "/recording.mp3"
-        println(output)
 
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
         speechRecognitionListener = object : RecognitionListener {
@@ -166,31 +162,70 @@ import kotlinx.coroutines.launch
 
             override fun onBufferReceived(buffer: ByteArray?) {}
 
+
             override fun onEndOfSpeech() {
-                Toast.makeText(this@MainActivity, "Speech ended", Toast.LENGTH_SHORT).show()
+                // Restart listening if isListening is true
+                if (isListening) {
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        speechRecognizer.cancel()
+                        startListening()
+                    }, 100)
+                }
             }
+
+
 
             override fun onError(error: Int) {
                 Toast.makeText(this@MainActivity, "Speech recognition error", Toast.LENGTH_SHORT).show()
             }
 
-            override fun onResults(results: Bundle?) {
-                val recognizedTexts = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                if (!recognizedTexts.isNullOrEmpty()) {
-                    val recognizedText = recognizedTexts[0]
-                    writeTextToFile(file, recognizedText)
-                    Toast.makeText(this@MainActivity, "Speech recognized and saved to file", Toast.LENGTH_SHORT).show()
-                    translateAudio(selectedLanguageCode)
-                    showText()
-                } else {
-                    Toast.makeText(this@MainActivity, "No speech recognized", Toast.LENGTH_SHORT).show()
+            override fun onResults(results: Bundle?) {}
+
+            override fun onPartialResults(partialResults: Bundle?) {
+                val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                matches?.firstOrNull()?.let { recognizedWord ->
+                    Toast.makeText(this@MainActivity, "Mot Reconnu: $recognizedWord", Toast.LENGTH_SHORT).show()
+                    addToPref("to translate", recognizedWord)
+                    translateCount += 1
+                    if (translateCount == 10) {
+                        translate(selectedLanguageCode)
+                        translateCount = 0
+                        save("to translate", "")
+                        if (currentMode == "translation"){
+                            showText()
+                        }
+                    }
+
+                    if (currentMode == "transcription" && !recognizedWords.contains(recognizedWord)) {
+                        recognizedWords.add(recognizedWord)
+                        runOnUiThread {
+                            // Ajoute le mot uniquement s'il n'est pas déjà présent dans le texte
+                            if (textView.text.isEmpty()) {
+                                textView.append(recognizedWord)
+                            } else {
+                                textView.append(" $recognizedWord")
+                            }
+
+                            // Scroll to the last line
+                            val layout = textView.layout
+                            // Check if the number of lines exceeds the limit
+                            if (textView.lineCount > MAX_LINES) {
+                                val firstLineEnd = layout.getLineEnd(0)
+                                textView.text = textView.text.subSequence(firstLineEnd + 1, textView.text.length)
+                            }
+
+                            addToPref("transcription", recognizedWord)
+                        }
+                    }
                 }
             }
 
-            override fun onPartialResults(partialResults: Bundle?) {}
+
 
             override fun onEvent(eventType: Int, params: Bundle?) {}
         }
+
+
 
         val buttonRecord = findViewById<Button>(R.id.buttonRecord)
         buttonRecord.setOnClickListener {
@@ -204,10 +239,15 @@ import kotlinx.coroutines.launch
             } else {
                 if (isListening) {
                     stopListening()
+                    speechRecognizer.destroy()
                     buttonRecord.text = "Start"
+                    isListening = false
+                    textView.text = ""
                 } else {
                     startListening()
                     buttonRecord.text = "Stop"
+                    isListening = true
+                    Toast.makeText(this@MainActivity, "En écoute", Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -224,8 +264,10 @@ import kotlinx.coroutines.launch
         buttonMode.setOnClickListener{
             if (currentMode == "transcription") {
                 currentMode = "translation"
-            } else if (currentMode == "translation") { currentMode = "transcription"}
-            showText()
+                Toast.makeText(this@MainActivity, "Mode translation", Toast.LENGTH_SHORT).show()
+            } else if (currentMode == "translation") {
+                currentMode = "transcription"
+                Toast.makeText(this@MainActivity, "Mode transcription", Toast.LENGTH_SHORT).show()}
         }
 
 
@@ -239,8 +281,14 @@ import kotlinx.coroutines.launch
 
 
     private fun startListening() {
-        // Start listening for speech
-        recognizeAudio()
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+        intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+
+
+
+        speechRecognizer.setRecognitionListener(speechRecognitionListener)
+        speechRecognizer.startListening(intent)
     }
 
     private fun stopListening() {
@@ -249,28 +297,6 @@ import kotlinx.coroutines.launch
         speechRecognizer.cancel()
         speechRecognizer.destroy()
     }
-
-    private fun setupPeriodicRefresh() {
-        val handler = Handler(Looper.getMainLooper())
-        val refreshRunnable = object : Runnable {
-            override fun run() {
-                if (isListening) {
-                    // Send the collected information and refresh
-                    showText()
-                    refresh()
-                }
-                handler.postDelayed(this, 10000) // Refresh every 10 seconds
-            }
-        }
-        handler.postDelayed(refreshRunnable, 10000) // Start refreshing after 10 seconds
-    }
-
-    private fun refresh() {
-        writeTextToFile(file, "")
-        // Implement the logic to refresh the UI or perform other actions
-    }
-
-
     //CAMERA
 
 
@@ -305,18 +331,6 @@ import kotlinx.coroutines.launch
 
         //startFaceDetection()
     }
-    fun onRequestPermissionResult(
-    requestCode:Int,
-    permissions:Array<out String>, grantResults: IntArray) {
-        if(requestCode == Constants.REQUEST_CODE_PERMISSIONS){
-            if (allPermissionsGranted()){
-                startCamera()
-            }else{
-                Toast.makeText(this,"Permission not granted by the user.",Toast.LENGTH_SHORT).show()
-                finish()
-            }
-        }
-    }
     private fun allPermissionsGranted() =
         Constants.REQUIRED_PERMISSIONS.all{
             ContextCompat.checkSelfPermission(
@@ -325,24 +339,10 @@ import kotlinx.coroutines.launch
         }
 
 
-    //val settingsImage = findViewById<ImageView>(R.id.settingsImage)
-
-    private val periodicRecognizeRunnable = object : Runnable {
-        override fun run() {
-            recognizeAudio()
-
-            // Planifier le prochain appel après le délai spécifié
-            handler.postDelayed(this, delayMillis)
-        }
-    }
-
 
     //Permet la traduction du fichier recording (via le bouton translate)
-    private fun translateAudio(selectedLanguageCode: String) {
-        val recordingFile = File(getExternalFilesDir(null), "recording.txt")
-        val translationFile = File(getExternalFilesDir(null), "translation.txt")
-
-        val recordingText = recordingFile.readText()
+    private fun translate(selectedLanguageCode: String) {
+        val recordingText = get("to translate")
 
         GlobalScope.launch(Dispatchers.IO) {
             try {
@@ -360,11 +360,10 @@ import kotlinx.coroutines.launch
 
 
                 // Write the translated text to the translation file
-                translationFile.writeText(translatedText)
+                save("translated", translatedText)
 
                 launch(Dispatchers.Main) {
                     Toast.makeText(this@MainActivity, "Audio translation completed!", Toast.LENGTH_SHORT).show()
-                    showText()
                 }
             } catch (e: IOException) {
                 e.printStackTrace()
@@ -374,111 +373,29 @@ import kotlinx.coroutines.launch
 
     //Permet d'afficher sur l'app le contenu d'un fichier texte (via le bouton Show)
     private fun showText() {
-        val filePath = getExternalFilesDir(null)?.absolutePath + "/recording.txt"
-        val filePath2 = getExternalFilesDir(null)?.absolutePath + "/translation.txt"
-        var textToShow = ""
 
-        try {
-            if (currentMode == "transcription") {
-                val file = File(filePath)
-                if (file.exists()) {
-                    val text = file.readText()
-                    textToShow = text.toUpperCase()
-                } else {
-                    textToShow = "File not found"
-                }
-            } else if (currentMode == "translation") {
-                val file2 = File(filePath2)
-                if (file2.exists()) {
-                    val text = file2.readText()
-                    textToShow = text.toUpperCase()
-                } else {
-                    textToShow = "File not found"
-                }
-            }
-        } catch (e: IOException) {
-            e.printStackTrace()
-            textToShow = "Error reading file"
-        }
+        val textToShow = get("translate")
         textView.setBackgroundColor(Color.BLACK)
         textView.text = textToShow
+        save("translate", "")
+
     }
 
-
-    //Gère la reconnaissance vocale (du bouton Record)
-    private fun recognizeAudio() {
-        val outputFile = getExternalFilesDir(null)?.absolutePath + "/recording.txt"
-
-        val speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
-        val speechRecognitionListener = object : RecognitionListener {
-            override fun onReadyForSpeech(params: Bundle?) {
-                Toast.makeText(this@MainActivity, "Ready for speech", Toast.LENGTH_SHORT).show()
-            }
-
-            override fun onBeginningOfSpeech() {
-                Toast.makeText(this@MainActivity, "Speech started", Toast.LENGTH_SHORT).show()
-            }
-
-            override fun onRmsChanged(rmsdB: Float) {}
-
-            override fun onBufferReceived(buffer: ByteArray?) {}
-
-            override fun onEndOfSpeech() {
-                Toast.makeText(this@MainActivity, "Speech ended", Toast.LENGTH_SHORT).show()
-            }
-
-            override fun onError(error: Int) {
-                Toast.makeText(this@MainActivity, "Speech recognition error", Toast.LENGTH_SHORT).show()
-            }
-
-            override fun onResults(results: Bundle?) {
-                val recognizedTexts = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                if (!recognizedTexts.isNullOrEmpty()) {
-                    val recognizedText = recognizedTexts[0]
-                    writeTextToFile(outputFile, recognizedText)
-                    Toast.makeText(this@MainActivity, "Speech recognized and saved to file", Toast.LENGTH_SHORT).show()
-                    translateAudio(selectedLanguageCode)
-                    showText()
-                } else {
-                    Toast.makeText(this@MainActivity, "No speech recognized", Toast.LENGTH_SHORT).show()
-                }
-            }
-
-            override fun onPartialResults(partialResults: Bundle?) {}
-
-            override fun onEvent(eventType: Int, params: Bundle?) {}
-        }
-
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-        intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-
-        try {
-            speechRecognizer.setRecognitionListener(speechRecognitionListener)
-            speechRecognizer.startListening(intent)
-        } catch (e: Exception) {
-            Toast.makeText(this, "Speech recognition not available", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    //Rédige un fichier texte dans les fichiers de l'app
-    private fun writeTextToFile(filePath: String, text: String) {
-        try {
-            val file = File(filePath)
-            file.createNewFile()
-            val writer = FileWriter(file)
-            writer.append(text)
-            writer.flush()
-            writer.close()
-        } catch (e: IOException) {
-            e.printStackTrace()
-        }
-    }
 
     private fun save(location: String,value: String) {
         val sharedPreferences = getSharedPreferences("Prefs", Context.MODE_PRIVATE)
         val editor = sharedPreferences.edit()
         editor.putString(location, value)
+        editor.apply()
+        Log.i("languages","$value saved in $location")
+    }
+
+    private fun addToPref(location: String,value: String) {
+        val sharedPreferences = getSharedPreferences("Prefs", Context.MODE_PRIVATE)
+        var string = get(location)
+        string += " $value"
+        val editor = sharedPreferences.edit()
+        editor.putString(location, string)
         editor.apply()
         Log.i("languages","$value saved in $location")
     }
